@@ -9,7 +9,9 @@
 #define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/stat.h>
-//#include <fcntl.h>
+#include <sys/socket.h>
+#include <sched.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <string.h>
@@ -18,9 +20,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <linux/mount.h>
-#include <linux/fcntl.h>
-
-
+#include <sys/wait.h>
 
 #define FSOPEN_CLOEXEC		0x00000001
 
@@ -92,18 +92,140 @@ static void check_messages(int fd)
 }
 
 static __attribute__((noreturn))
-void mount_error(int fd, const char *s)
-{
+void mount_error(int fd, const char *s) {
 	check_messages(fd);
 	fprintf(stderr, "%s: %m\n", s);
 	exit(1);
 }
 
+static int
+sendfd(int sockfd, int baggagefd) {
+	struct msghdr msg;
+	struct iovec iov[1];
+	char c = 0;
+	union {
+		struct cmsghdr cm;
+		char control[CMSG_SPACE(sizeof(int))];
+	} control_un;
+	struct cmsghdr *cmptr;
+	int ret;
+
+	msg.msg_control = control_un.control;
+	msg.msg_controllen = sizeof(control_un.control);
+
+	cmptr = CMSG_FIRSTHDR(&msg);
+	cmptr->cmsg_len = CMSG_LEN(sizeof(int));
+	cmptr->cmsg_level = SOL_SOCKET;
+	cmptr->cmsg_type = SCM_RIGHTS;
+	*((int *) CMSG_DATA(cmptr)) = baggagefd;
+
+	msg.msg_name = NULL;
+	msg.msg_namelen = 0;
+
+	iov[0].iov_base = &c;
+	iov[0].iov_len = 1;
+	msg.msg_iov = iov;
+	msg.msg_iovlen = 1;
+
+	ret = sendmsg(sockfd, &msg, 0);
+	if (ret == 1)
+		return 0;
+	else
+		return -1;
+}
+
+static int
+receivefd(int sockfd, int *baggagefd) {
+	struct msghdr msg;
+	struct iovec iov[1];
+	ssize_t n;
+	char c;
+
+	union {
+		struct cmsghdr cm;
+		char control[CMSG_SPACE(sizeof (int))];
+	} control_un;
+	struct cmsghdr *cmptr;
+
+	msg.msg_control  = control_un.control;
+	msg.msg_controllen = sizeof(control_un.control);
+
+	msg.msg_name = NULL;
+	msg.msg_namelen = 0;
+
+	iov[0].iov_base = &c;
+	iov[0].iov_len = 1;
+	msg.msg_iov = iov;
+	msg.msg_iovlen = 1;
+
+	n = recvmsg(sockfd, &msg, 0);
+	if (n <= 0)
+		return n;
+
+	if ( (cmptr = CMSG_FIRSTHDR(&msg)) != NULL && cmptr->cmsg_len == CMSG_LEN(sizeof(int))) {
+		assert(cmptr->cmsg_level == SOL_SOCKET);
+		assert(cmptr->cmsg_type == SCM_RIGHTS);
+		*baggagefd = *((int *) CMSG_DATA(cmptr));
+	} else {
+		*baggagefd = -1;
+	}
+	return 0;
+}
+
 int
 get_sfd(char *netns_path, char *userns_path) {
-	int sfd;
-	sfd = fsopen("nfs", FSOPEN_CLOEXEC);
-	return sfd;
+	int netns_fd = open(netns_path, O_RDONLY);
+	assert(netns_fd != -1);
+
+	int userns_fd = open(userns_path, O_RDONLY);
+	assert(userns_fd != -1);
+
+	int sockfd[2];
+	int ret = socketpair(AF_UNIX, SOCK_STREAM, 0, sockfd);
+
+	int childpid;
+	if ((childpid = fork()) == 0) {
+		// child
+		close(sockfd[0]);
+
+		ret = setns(netns_fd, 0);
+		if (ret == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
+		assert(ret == 0);
+
+		ret = setns(userns_fd, 0);
+		if (ret == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
+		assert(ret == 0);
+
+		int sfd;
+		sfd = fsopen("nfs", FSOPEN_CLOEXEC);
+		assert(sfd != -1);
+
+		ret = sendfd(sockfd[1], sfd);
+		assert(ret == 0);
+
+		exit(0);
+	}
+
+	// parent
+	close(sockfd[1]);
+
+	int status;
+	waitpid(childpid, &status, 0);
+	if (WIFEXITED(status) == 0) {
+		fprintf(stderr, "Error: child did not terminate\n");
+		exit(1);
+	}
+	int fd_from_child;
+	if ( (status = WEXITSTATUS(status)) == 0) {
+		ret = receivefd(sockfd[0], &fd_from_child);
+		assert(ret == 0);
+	} else {
+		fprintf(stderr, "Error: child returned %d\n", status);
+		exit(1);
+	}
+	close(sockfd[0]);
+
+	return fd_from_child;
 }
 
 void
@@ -159,8 +281,7 @@ finish_mount(int sfd) {
 	assert(ret == 0);
 
 	mfd = fsmount(sfd, FSMOUNT_CLOEXEC, 0);
-	if (mfd == -1)
-		fprintf(stderr, "Error: %s\n", strerror(errno));
+	if (mfd == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
 	assert(mfd >= 0);
 
 	ret = close (sfd);

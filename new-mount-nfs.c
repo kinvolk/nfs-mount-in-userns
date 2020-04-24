@@ -100,16 +100,19 @@ void mount_error(int fd, const char *s)
 }
 
 int
-main(int argc, char **argv) {
-	int ret;
+get_sfd(char *netns_path, char *userns_path) {
 	int sfd;
+	sfd = fsopen("nfs", FSOPEN_CLOEXEC);
+	return sfd;
+}
+
+void
+finish_mount(int sfd) {
+	int ret;
 	int mfd;
 
 	// mount("127.0.0.1:/tmp/nfsserver", "/mnt/nfs", "nfs", 0, "hard,vers=4.2,addr=127.0.0.1,clientaddr=127.0.0.1")
 	// mount("127.0.0.1:/tmp/nfsserver", "/mnt/nfs", "nfs", 0, "hard,addr=127.0.0.1,vers=3,proto=tcp,mountvers=3,mountproto=udp,mountport=20048") = 0
-
-	sfd = fsopen("nfs", FSOPEN_CLOEXEC);
-	assert(sfd >= 0);
 
 	ret = fsconfig(sfd, FSCONFIG_SET_FLAG, "ro", NULL, 0);
 	if (ret == -1) mount_error(sfd, "ro");
@@ -166,7 +169,21 @@ main(int argc, char **argv) {
 	ret = move_mount(mfd, "", AT_FDCWD, "/mnt/nfs", MOVE_MOUNT_F_EMPTY_PATH);
 	assert(ret == 0);
 
+}
 
+int
+main(int argc, char **argv) {
+	if (argc < 3) {
+		fprintf(stderr, "%s /proc/PID/ns/net /proc/PID/ns/user\n", argv[0]);
+		exit(EXIT_FAILURE);
+	}
+
+	int sfd;
+
+	sfd = get_sfd(argv[1], argv[2]);
+	assert(sfd >= 0);
+
+	finish_mount(sfd);
 	return 0;
 }
 

@@ -173,11 +173,14 @@ receivefd(int sockfd, int *baggagefd) {
 }
 
 int
-get_sfd(char *netns_path, char *userns_path) {
+get_sfd(char *netns_path, char *userns_path, char *mntns_path) {
 	int netns_fd = open(netns_path, O_RDONLY);
 	assert(netns_fd != -1);
 
 	int userns_fd = open(userns_path, O_RDONLY);
+	assert(userns_fd != -1);
+
+	int mntns_fd = open(mntns_path, O_RDONLY);
 	assert(userns_fd != -1);
 
 	int sockfd[2];
@@ -196,8 +199,13 @@ get_sfd(char *netns_path, char *userns_path) {
 		if (ret == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
 		assert(ret == 0);
 
+		ret = setns(mntns_fd, 0);
+		if (ret == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
+		assert(ret == 0);
+
 		int sfd;
 		sfd = fsopen("nfs", FSOPEN_CLOEXEC);
+		if (sfd == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
 		assert(sfd != -1);
 
 		ret = sendfd(sockfd[1], sfd);
@@ -264,7 +272,7 @@ finish_mount(int sfd) {
 	if (ret == -1) mount_error(sfd, "mountproto");
 	assert(ret == 0);
 
-	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "mountport", "20048", 0);
+	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "mountport", "56859", 0);
 	if (ret == -1) mount_error(sfd, "mountport");
 	assert(ret == 0);
 
@@ -294,14 +302,14 @@ finish_mount(int sfd) {
 
 int
 main(int argc, char **argv) {
-	if (argc < 3) {
-		fprintf(stderr, "%s /proc/PID/ns/net /proc/PID/ns/user\n", argv[0]);
+	if (argc < 4) {
+		fprintf(stderr, "%s /proc/PID/ns/net /proc/PID/ns/user /proc/PID/ns/mnt\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
 
 	int sfd;
 
-	sfd = get_sfd(argv[1], argv[2]);
+	sfd = get_sfd(argv[1], argv[2], argv[3]);
 	assert(sfd >= 0);
 
 	finish_mount(sfd);

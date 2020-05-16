@@ -248,33 +248,33 @@ finish_mount(int sfd) {
 	if (ret == -1) mount_error(sfd, "ro");
 	assert(ret == 0);
 
-	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "source", "127.0.0.1:/tmp/nfsserver", 0);
+	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "source", "127.0.0.1:/server", 0);
 	if (ret == -1) mount_error(sfd, "source");
 	assert(ret == 0);
 
-	ret = fsconfig(sfd, FSCONFIG_SET_FLAG, "hard", NULL, 0);
-	if (ret == -1) mount_error(sfd, "hard");
-	assert(ret == 0);
+	//ret = fsconfig(sfd, FSCONFIG_SET_FLAG, "hard", NULL, 0);
+	//if (ret == -1) mount_error(sfd, "hard");
+	//assert(ret == 0);
 
-	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "vers", "3", 0);
+	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "vers", "4.2", 0);
 	if (ret == -1) mount_error(sfd, "vers");
 	assert(ret == 0);
 
-	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "proto", "tcp", 0);
-	if (ret == -1) mount_error(sfd, "proto");
-	assert(ret == 0);
+	//ret = fsconfig(sfd, FSCONFIG_SET_STRING, "proto", "tcp", 0);
+	//if (ret == -1) mount_error(sfd, "proto");
+	//assert(ret == 0);
 
-	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "mountvers", "3", 0);
-	if (ret == -1) mount_error(sfd, "mountvers");
-	assert(ret == 0);
+	//ret = fsconfig(sfd, FSCONFIG_SET_STRING, "mountvers", "3", 0);
+	//if (ret == -1) mount_error(sfd, "mountvers");
+	//assert(ret == 0);
 
-	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "mountproto", "udp", 0);
-	if (ret == -1) mount_error(sfd, "mountproto");
-	assert(ret == 0);
+	//ret = fsconfig(sfd, FSCONFIG_SET_STRING, "mountproto", "udp", 0);
+	//if (ret == -1) mount_error(sfd, "mountproto");
+	//assert(ret == 0);
 
-	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "mountport", "56859", 0);
-	if (ret == -1) mount_error(sfd, "mountport");
-	assert(ret == 0);
+	//ret = fsconfig(sfd, FSCONFIG_SET_STRING, "mountport", "56859", 0);
+	//if (ret == -1) mount_error(sfd, "mountport");
+	//assert(ret == 0);
 
 	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "addr", "127.0.0.1", 0);
 	if (ret == -1) mount_error(sfd, "addr");

@@ -204,7 +204,7 @@ get_sfd(char *netns_path, char *userns_path, char *mntns_path) {
 		assert(ret == 0);
 
 		int sfd;
-		sfd = fsopen("nfs", FSOPEN_CLOEXEC);
+		sfd = fsopen("nfs4", FSOPEN_CLOEXEC);
 		if (sfd == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
 		assert(sfd != -1);
 
@@ -244,9 +244,9 @@ finish_mount(int sfd) {
 	// mount("127.0.0.1:/tmp/nfsserver", "/mnt/nfs", "nfs", 0, "hard,vers=4.2,addr=127.0.0.1,clientaddr=127.0.0.1")
 	// mount("127.0.0.1:/tmp/nfsserver", "/mnt/nfs", "nfs", 0, "hard,addr=127.0.0.1,vers=3,proto=tcp,mountvers=3,mountproto=udp,mountport=20048") = 0
 
-	ret = fsconfig(sfd, FSCONFIG_SET_FLAG, "ro", NULL, 0);
-	if (ret == -1) mount_error(sfd, "ro");
-	assert(ret == 0);
+	//ret = fsconfig(sfd, FSCONFIG_SET_FLAG, "ro", NULL, 0);
+	//if (ret == -1) mount_error(sfd, "ro");
+	//assert(ret == 0);
 
 	ret = fsconfig(sfd, FSCONFIG_SET_STRING, "source", "127.0.0.1:/server", 0);
 	if (ret == -1) mount_error(sfd, "source");

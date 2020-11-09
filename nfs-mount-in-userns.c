@@ -181,7 +181,7 @@ get_sfd(char *netns_path, char *userns_path, char *mntns_path) {
 	assert(userns_fd != -1);
 
 	int mntns_fd = open(mntns_path, O_RDONLY);
-	assert(userns_fd != -1);
+	assert(mntns_fd != -1);
 
 	int sockfd[2];
 	int ret = socketpair(AF_UNIX, SOCK_STREAM, 0, sockfd);
@@ -195,11 +195,11 @@ get_sfd(char *netns_path, char *userns_path, char *mntns_path) {
 		if (ret == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
 		assert(ret == 0);
 
-		ret = setns(userns_fd, 0);
+		ret = setns(mntns_fd, 0);
 		if (ret == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
 		assert(ret == 0);
 
-		ret = setns(mntns_fd, 0);
+		ret = setns(userns_fd, 0);
 		if (ret == -1) fprintf(stderr, "Error: %s\n", strerror(errno));
 		assert(ret == 0);
 
@@ -242,7 +242,6 @@ finish_mount(int sfd) {
 	int mfd;
 
 	// mount("127.0.0.1:/tmp/nfsserver", "/mnt/nfs", "nfs", 0, "hard,vers=4.2,addr=127.0.0.1,clientaddr=127.0.0.1")
-	// mount("127.0.0.1:/tmp/nfsserver", "/mnt/nfs", "nfs", 0, "hard,addr=127.0.0.1,vers=3,proto=tcp,mountvers=3,mountproto=udp,mountport=20048") = 0
 
 	//ret = fsconfig(sfd, FSCONFIG_SET_FLAG, "ro", NULL, 0);
 	//if (ret == -1) mount_error(sfd, "ro");
